@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "poetry-plugin-deps-juice"
 version = "0.0.1"
-description = "Poetry plugin for simple mix dependencies to main group and wrap poetry 'build' command."
+description = "Poetry plugin for simple mix dependencies from toml option and wrap poetry 'build' command."
 readme = "README.md"
 authors = ["BlackCatDevel0per <bcdev@mail.ru>"]
 license = "Apache 2.0"
@@ -130,7 +130,7 @@ indent-style = "tab"
 
 ## Simple example
 [tool.poetry-plugin-deps-juice]
-poetry = [
+"poetry" = [
 	"base",
 	"setup",
 	# "test"
@@ -139,6 +139,7 @@ poetry = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
+poetry = "^1.8.0"
 
 [tool.poetry.group.fancy]
 
@@ -148,7 +149,6 @@ rich = "^13.7.1"
 [tool.poetry.group.base]
 
 [tool.poetry.group.base.dependencies]
-poetry = "^1.8.0"
 poetry-core = "^1.7.0"
 
 [tool.poetry.group.setup]
@@ -174,7 +174,7 @@ rich = "^13.7.0"
 
 
 [tool.poetry.plugins."poetry.application.plugin"]
-build = "poetry_plugin_deps_juice.plugins:BuildApplicationPlugin"
+build = "poetry_plugin_deps_juice.plugins:DependenciesJuiceApplicationPlugin"
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
