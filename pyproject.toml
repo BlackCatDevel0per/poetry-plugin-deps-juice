@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "poetry-plugin-deps-juice"
-version = "0.0.1"
+version = "0.0.2"
 description = "Poetry plugin for simple mix dependencies from toml option and wrap poetry 'build' command."
 readme = "README.md"
 authors = ["BlackCatDevel0per <bcdev@mail.ru>"]
@@ -150,13 +150,13 @@ rich = "^13.7.1"
 
 [tool.poetry.group.base.dependencies]
 poetry-core = "^1.7.0"
+wheel = "^0.42.0"
 
 [tool.poetry.group.setup]
 
 [tool.poetry.group.setup.dependencies]
 build = "^1.0.3"
 setuptools = "^69.0.3"
-wheel = "^0.42.0"
 
 [tool.poetry.group.test]
 

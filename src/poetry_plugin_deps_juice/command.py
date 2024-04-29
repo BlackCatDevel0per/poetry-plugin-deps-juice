@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from poetry.console.commands.build import BuildCommand
 from poetry.console.commands.group_command import GroupCommand
+from poetry.core.factory import Factory
 from poetry.core.packages.dependency_group import MAIN_GROUP
+from poetry.core.poetry import Poetry
 
 if TYPE_CHECKING:
-	from typing import Any, Final, Mapping
+	from collections.abc import Mapping
+	from typing import Any, Final
 
-	from poetry.poetry import Poetry
 	from tomlkit.items import Table
 
 	from poetry_plugin_deps_juice.plugins import Group
@@ -32,15 +35,15 @@ class JuiceCommand(GroupCommand):
 
 
 	def pre_handle(self: JuiceCommand):
-		# print(self.poetry.local_config['group'])
-		# print(self.poetry.local_config['dependencies'])
-		# exit()
-		self.toml_content: Mapping[str, Any] = self.poetry.pyproject.data
-		self.poetry_local_conf: Mapping[str, Any] = self.poetry.local_config
+		toml_content: Mapping[str, Any] = self.poetry.pyproject.data
+		self.poetry_local_conf: dict[str, Any] = self.poetry.local_config.copy()
 
-		self._groups2mix: Mapping[Group, list[Group]] | dict = self.toml_content.get(
+		# From plugin's section
+		self._groups2mix: Mapping[Group, list[Group]] | dict = toml_content.get(
 			'tool', {},
 		).get(self.plugin_section)
+
+		del toml_content
 
 
 # TODO: Add, remove, update groups
@@ -74,31 +77,69 @@ class JuiceBuildCommand(JuiceCommand, BuildCommand):
 		poetry_group: Table,
 		poetry_main_deps: Table,
 	) -> Table | dict:
-		if group_name == 'poetry':
+		if group_name == 'poetry':  # or just "main"
 			return poetry_main_deps
 		return poetry_group.get(group_name, {}).get('dependencies', {})
+
+
+	def mix_deps(
+		self: JuiceCommand,
+		poetry_group: Table,
+		poetry_main_deps: Table,
+		log_level: str = 'info',
+	) -> None:
+		self.line('Mixing juice..', log_level)
+		for to_mix, groups in self._groups2mix.items():
+			to_mix_deps = self._get_group_deps(to_mix, poetry_group, poetry_main_deps)
+			for group_name in groups:
+				group_deps = self._get_group_deps(group_name, poetry_group, poetry_main_deps)
+				self.line(f'{group_name} -> {to_mix}', log_level)
+				self.line(f'	{group_deps}', log_level)
+				to_mix_deps.update(group_deps)
+
+
+	def recreate_poetry(self: JuiceBuildCommand) -> None:
+		factory: Factory = Factory()
+		poetry_file = factory.locate(Path.cwd())  # NOTE: Better use as constant..
+		local_config: Mapping[str, Any] = self.poetry_local_conf
+
+		# Checking validity
+		check_result = factory.validate(local_config)
+		if check_result['errors']:
+			message = ''
+			for error in check_result['errors']:
+				message += f'  - {error}\n'
+
+			raise RuntimeError('The Poetry configuration is invalid:\n' + message)
+
+		# Load package
+		# If name or version were missing in package mode, we would have already
+		# raised an error, so we can safely assume they might only be missing
+		# in non-package mode and use some dummy values in this case.
+		name: str = local_config.get('name', 'non-package-mode')
+		assert isinstance(name, str)
+		version: str = local_config.get('version', '0')
+		assert isinstance(version, str)
+		package = factory.get_package(name, version)
+		package = factory.configure_package(
+			package, local_config, poetry_file.parent, with_groups=True,
+		)
+
+		new_poetry: Poetry = Poetry(poetry_file, local_config, package)
+		self.set_poetry(new_poetry)
 
 
 	def handle(self: JuiceLookCommand) -> int:
 		self.pre_handle()
 
 		# TODO: Better type check..
-		# poetry: Mapping[str, Any] = self.toml_content.get('tool', {}).get('poetry', {})
-		# poetry_main_deps: Table = poetry.get('dependencies', {})
-		# poetry_group: Table = poetry.get('group', {})
 
-		poetry_main_deps: Table = self.poetry_local_conf.get('dependencies', {})
-		poetry_group: Table = self.poetry_local_conf.get('group', {})
+		poetry_main_deps: dict = self.poetry_local_conf.get('dependencies', {})
+		poetry_group: dict = self.poetry_local_conf.get('group', {})
 
-		self.line('Mixing juice..', 'info')
-		for to_mix, groups in self._groups2mix.items():
-			to_mix_deps = self._get_group_deps(to_mix, poetry_group, poetry_main_deps)
-			for group_name in groups:
-				group_deps = self._get_group_deps(group_name, poetry_group, poetry_main_deps)
-				self.line(f'{group_name} -> {to_mix}', 'info')
-				self.line(f'	{group_deps}', 'info')
-				to_mix_deps.update(group_deps)
+		self.mix_deps(poetry_group, poetry_main_deps, 'info')
 
-		# print(poetry_main_deps)
+		# Recreate poetry because we don't want manually change every stuff that poetry already do
+		self.recreate_poetry()
 
 		return BuildCommand.handle(self)
