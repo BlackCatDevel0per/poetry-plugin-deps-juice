@@ -41,7 +41,7 @@ class JuiceCommand(GroupCommand):
 		# From plugin's section
 		self._groups2mix: Mapping[Group, list[Group]] | dict = toml_content.get(
 			'tool', {},
-		).get(self.plugin_section)
+		).get(self.plugin_section, {}).copy()
 
 		del toml_content
 

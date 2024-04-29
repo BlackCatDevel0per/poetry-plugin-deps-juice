@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "poetry-plugin-deps-juice"
-version = "0.0.2"
+version = "0.0.3"
 description = "Poetry plugin for simple mix dependencies from toml option and wrap poetry 'build' command."
 readme = "README.md"
 authors = ["BlackCatDevel0per <bcdev@mail.ru>"]
